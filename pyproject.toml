@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cids-cli"
+version = "0.1.0"
+description = "Command-line access to the ASIE/CIDS model application"
+requires-python = ">=3.9"
+dependencies = ["requests>=2.31", "jsonschema>=4.21"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+cids = "cids_cli.cli:main"
+cids-cli = "cids_cli.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["cids_cli*"]
+
+[tool.setuptools.package-data]
+cids_cli = ["*.json"]
