@@ -8,3 +8,6 @@ build/
 *.egg-info/
 .env
 captures/
+
+# Local lesson exports may contain student or staff personal data.
+cids_week_*.json

@@ -6,7 +6,7 @@ PHP site rather than a documented public API, so the CLI mirrors its observed
 routes and form targets.
 
 The complete browser-derived inventory is in
-[FUNCTION_MAP.md](/Users/copu/Documents/cids-cli/FUNCTION_MAP.md). No username,
+[FUNCTION_MAP.md](FUNCTION_MAP.md). No username,
 password, session token, live record identifier, or personal record is stored in
 this repository.
 
@@ -146,3 +146,11 @@ pytest -q
 ```
 
 The test suite is local and mocked; it does not contact `asiemodel.net`.
+
+## Responsible use
+
+Use this software only with an account and data you are authorized to access,
+and only where the site owner permits automated access. Lesson files and API
+responses may contain personal or confidential information; do not commit them
+to a public repository. This project is independent and is not affiliated with
+or endorsed by ASIE or the CIDS application maintainers.
