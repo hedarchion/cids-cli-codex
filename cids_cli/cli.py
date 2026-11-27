@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from urllib.parse import quote, urljoin
@@ -14,6 +16,8 @@ from . import __version__
 from .client import AuthError, CidsClient, CidsError, BASE_URL, cookie_path, render_plan, render_response
 from .registry import FunctionSpec, as_dict, get_function, iter_functions
 from .import_week import check_week, import_week, validate_week, week_schema
+from .timetable import timetable_periods
+from .week_log import list_weeks, set_week
 
 
 def _key_values(values: Optional[Sequence[str]], label: str) -> Dict[str, str]:
@@ -182,6 +186,40 @@ def cmd_week_schema(args: argparse.Namespace) -> int:
     return 0
 
 
+def _parse_date(value: str) -> date:
+    try:
+        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+            raise ValueError
+        return date.fromisoformat(value)
+    except ValueError:
+        raise CidsError("Expected a date in YYYY-MM-DD format.", code="DATE_INVALID", exit_status=2) from None
+
+
+def cmd_timetable_periods(args: argparse.Namespace) -> int:
+    first_day, last_day = _parse_date(args.date_from), _parse_date(args.date_to)
+    if last_day < first_day:
+        raise CidsError("The date range ends before it starts.", code="DATE_RANGE_INVALID", exit_status=2)
+    client = _client(args)
+    authenticated, _ = client.status()
+    if not authenticated:
+        raise AuthError("No authenticated session. Run 'cids auth login' first.")
+    result = timetable_periods(client, first_day, last_day, class_id=args.class_id, subject=args.subject)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_week_log_set(args: argparse.Namespace) -> int:
+    result = set_week(args.session, args.week, _parse_date(args.date_from), _parse_date(args.date_to))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_week_log_list(args: argparse.Namespace) -> int:
+    day = _parse_date(args.date) if args.date is not None else None
+    print(json.dumps(list_weeks(session=args.session, week=args.week, day=day), ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_import_week(args: argparse.Namespace) -> int:
     source = Path(args.source).expanduser()
     if not source.is_file():
@@ -280,6 +318,30 @@ def build_parser() -> argparse.ArgumentParser:
 
     schema = sub.add_parser("week-schema", help="Print the weekly lesson JSON schema without network access.")
     schema.set_defaults(handler=cmd_week_schema)
+
+    periods = sub.add_parser("timetable-periods", help="Read the CIDS timetable revision and teaching periods for each date.")
+    periods.add_argument("--date-from", required=True, help="First lesson date in YYYY-MM-DD format.")
+    periods.add_argument("--date-to", required=True, help="Last lesson date in YYYY-MM-DD format.")
+    periods.add_argument("--class-id", help="Return periods for this CIDS class ID.")
+    periods.add_argument("--subject", help="Return periods with this CIDS subject label.")
+    periods.set_defaults(handler=cmd_timetable_periods)
+
+    week_log = sub.add_parser("week-log", help="Keep a local log of confirmed school teaching weeks.")
+    log_sub = week_log.add_subparsers(dest="week_log_command", required=True)
+    log_set = log_sub.add_parser("set", help="Record or update a range with the same session and start date.")
+    log_set.add_argument("--session", required=True, help="CIDS academic session.")
+    log_set.add_argument("--date-from", required=True, help="First date in YYYY-MM-DD format.")
+    log_set.add_argument("--date-to", required=True, help="Last date in YYYY-MM-DD format.")
+    log_number = log_set.add_mutually_exclusive_group(required=True)
+    log_number.add_argument("--week", type=int, help="School teaching week number.")
+    log_number.add_argument("--no-teaching", dest="week", action="store_const", const=None, help="Record a non-teaching range.")
+    log_set.set_defaults(handler=cmd_week_log_set)
+    log_list = log_sub.add_parser("list", help="List logged weeks, with optional filters.")
+    log_list.add_argument("--session", help="Only show this CIDS session.")
+    log_list.add_argument("--week", type=int, help="Only show this teaching week.")
+    log_list.add_argument("--date", help="Only show ranges covering this date in YYYY-MM-DD format.")
+    log_list.set_defaults(handler=cmd_week_log_list)
+
     importer = sub.add_parser("import-week", help="Import a weekly lesson JSON file into an existing MIW.")
     importer.add_argument("source", help="Path to the weekly lesson JSON file.")
     importer.add_argument("--miw-id")
@@ -306,7 +368,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("Interrupted.", file=sys.stderr)
         return 130
     except CidsError as exc:
-        if getattr(args, "command", None) == "import-week":
+        if getattr(args, "command", None) in {"import-week", "timetable-periods", "week-log"}:
             payload = {
                 "ok": False,
                 "error": {

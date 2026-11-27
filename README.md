@@ -133,8 +133,8 @@ corresponding fields. An existing DLP keeps its standards when updated.
 The CLI reads the MIW's subject and session for new-slot checks. Pass
 `--subject` and `--session` if the MIW does not expose them.
 
-Each live run targets one account, MIW and class. Get the MIW ID from its
-`openmiw` link, the class and timetable IDs from the activated timetable, and
+Each live run targets one account, MIW, class and timetable revision. Get the MIW ID from its
+`openmiw` link, the class and timetable IDs from the dated periods below, and
 the owner ID and `grouplevelsubject` from the target CIDS forms. The
 `records.list`, `miw.open`, `classes.list` and `timetable.view` read-only
 functions can help locate them.
@@ -174,6 +174,31 @@ writes began but the batch did not finish. Important codes include
 `IMPORT_PARTIAL`. A partial import reports the failed entry, its lesson ID
 when available, and the underlying `cause_code`. Review that entry and run
 `--check` before resuming from the same file.
+
+## Timetable changes and teaching-week numbers
+
+`cids timetable-periods` reads active and archived CIDS timetable revisions.
+Each date in its output has a timetable ID and the periods that apply that
+day when CIDS provides a single fixed revision. Flexible timetables,
+overlapping revisions and missing dates are flagged for a teacher to resolve.
+Check the dates before each import. If a timetable changes midweek, prepare
+one import per revision with its own `--setjadual`.
+
+```sh
+cids timetable-periods --date-from 2027-03-22 --date-to 2027-03-26 --subject Science
+cids week-log set --session 2027 --week 12 --date-from 2027-03-22 --date-to 2027-03-26
+cids week-log list --session 2027 --date 2027-03-24
+```
+
+The teaching-week log stores school-confirmed date ranges locally under the
+CIDS CLI configuration directory. The week number comes from the school.
+Use `--no-teaching` for a confirmed school break outside a numbered week.
+Setting a range with the same session and start date updates that entry.
+Overlapping entries in one session return an error.
+
+The agent skill checks with the teacher about holidays, exams, programmes
+and special duties. For an affected period it asks whether to skip it,
+reschedule it, or record the reflection the school requires.
 
 ## Agent skill
 
