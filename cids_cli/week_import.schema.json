@@ -15,7 +15,7 @@
       "items": {
         "type": "object",
         "required": [
-          "date", "time_from", "time_to", "topic", "cs_code", "ls_code",
+          "date", "time_from", "time_to", "topic",
           "activity_html", "reflection_html", "notes_html"
         ],
         "properties": {
@@ -27,8 +27,13 @@
           "time_from": {"type": "string", "pattern": "^(?:0?[1-9]|1[0-2]):[0-5][0-9] [AP]M$"},
           "time_to": {"type": "string", "pattern": "^(?:0?[1-9]|1[0-2]):[0-5][0-9] [AP]M$"},
           "topic": {"type": "string", "minLength": 1},
-          "cs_code": {"type": "string", "minLength": 1},
-          "ls_code": {"type": "string", "minLength": 1},
+          "cs_code": {"type": "string", "pattern": "\\S", "description": "Content Standard code or exact MIW label."},
+          "ls_code": {"type": "string", "pattern": "\\S", "description": "Learning Standard code or exact MIW label."},
+          "objectives": {"$ref": "#/$defs/objectiveList", "description": "One plain-text CIDS Learning Objective per item."},
+          "objectives_html": {"$ref": "#/$defs/objectiveText"},
+          "objective_html": {"$ref": "#/$defs/objectiveText"},
+          "learning_objectives": {"$ref": "#/$defs/legacyObjectives"},
+          "lesson_objectives": {"$ref": "#/$defs/legacyObjectives"},
           "activity_html": {"type": "string", "minLength": 1},
           "reflection_html": {"type": "string", "minLength": 1},
           "notes_html": {"type": "string"}
@@ -37,5 +42,16 @@
       }
     }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "$defs": {
+    "objectiveText": {"type": "string", "pattern": "\\S"},
+    "objectiveList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/objectiveText"}
+    },
+    "legacyObjectives": {
+      "anyOf": [{"$ref": "#/$defs/objectiveList"}, {"$ref": "#/$defs/objectiveText"}]
+    }
+  }
 }

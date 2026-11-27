@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from urllib.parse import quote, urljoin
 
-from .client import AuthError, CidsClient, CidsError, RequestError, BASE_URL, cookie_path, render_plan, render_response
+from . import __version__
+from .client import AuthError, CidsClient, CidsError, BASE_URL, cookie_path, render_plan, render_response
 from .registry import FunctionSpec, as_dict, get_function, iter_functions
-from .import_week import check_week, import_week, validate_week
+from .import_week import check_week, import_week, validate_week, week_schema
 
 
 def _key_values(values: Optional[Sequence[str]], label: str) -> Dict[str, str]:
@@ -104,6 +105,13 @@ def cmd_describe(args: argparse.Namespace) -> int:
 
 
 def cmd_login(args: argparse.Namespace) -> int:
+    if args.non_interactive and (
+        not (args.username or os.environ.get("CIDS_USERNAME")) or not os.environ.get("CIDS_PASSWORD")
+    ):
+        raise AuthError(
+            "Set CIDS_USERNAME and CIDS_PASSWORD for non-interactive login.",
+            code="AUTH_CREDENTIALS_MISSING",
+        )
     client = _client(args)
     client.login(username=args.username)
     print(f"Logged in. Session cookies saved to {cookie_path()}")
@@ -169,6 +177,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_week_schema(args: argparse.Namespace) -> int:
+    print(json.dumps(week_schema(), ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_import_week(args: argparse.Namespace) -> int:
     source = Path(args.source).expanduser()
     if not source.is_file():
@@ -178,9 +191,9 @@ def cmd_import_week(args: argparse.Namespace) -> int:
             exit_status=2,
         )
 
-    if args.yes and (args.dry_run or args.check):
+    if sum((args.yes, args.dry_run, args.check)) > 1:
         raise CidsError(
-            "--yes cannot be combined with --dry-run or --check.",
+            "Choose one of --dry-run, --check, or --yes.",
             code="IMPORT_MODE_CONFLICT",
             exit_status=2,
         )
@@ -227,6 +240,7 @@ def cmd_import_week(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cids", description="Operate the ASIE/CIDS model application from a terminal.")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--base-url", default=os.environ.get("CIDS_BASE_URL", BASE_URL), help=argparse.SUPPRESS)
     parser.add_argument("--timeout", type=float, default=30.0, help=argparse.SUPPRESS)
     parser.add_argument("--trace", action="store_true", help="Print sanitized request traces to stderr.")
@@ -246,6 +260,7 @@ def build_parser() -> argparse.ArgumentParser:
     auth_sub = auth.add_subparsers(dest="auth_command", required=True)
     login = auth_sub.add_parser("login", help="Log in using env vars or secure prompts.")
     login.add_argument("--username", help="Username (otherwise CIDS_USERNAME or a prompt).")
+    login.add_argument("--non-interactive", action="store_true", help="Read credentials from the environment and never prompt.")
     login.set_defaults(handler=cmd_login)
     status = auth_sub.add_parser("status", help="Check the current session.")
     status.add_argument("--json", action="store_true")
@@ -263,18 +278,19 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--output-file", help="Write output to this file instead of stdout.")
     run.set_defaults(handler=cmd_run)
 
-    importer = sub.add_parser("import-week", help="Import a generated weekly lesson JSON into an existing MIW.")
+    schema = sub.add_parser("week-schema", help="Print the weekly lesson JSON schema without network access.")
+    schema.set_defaults(handler=cmd_week_schema)
+    importer = sub.add_parser("import-week", help="Import a weekly lesson JSON file into an existing MIW.")
     importer.add_argument("source", help="Path to the weekly lesson JSON file.")
     importer.add_argument("--miw-id")
     importer.add_argument("--class-id")
     importer.add_argument("--setjadual", help="Activated timetable identifier.")
     importer.add_argument("--owner-id")
     importer.add_argument("--grouplevelsubject")
-    importer.add_argument("--subject", default="english")
-    importer.add_argument("--session", default="2026")
-    mode = importer.add_mutually_exclusive_group()
-    mode.add_argument("--dry-run", action="store_true", help="Validate locally; perform no network requests or writes.")
-    mode.add_argument("--check", action="store_true", help="Run authenticated remote preflight checks without CIDS writes.")
+    importer.add_argument("--subject", help="CIDS subject value for slot checks (defaults to the MIW subject).")
+    importer.add_argument("--session", help="CIDS session for slot checks (defaults to the MIW session).")
+    importer.add_argument("--dry-run", action="store_true", help="Validate locally without network access.")
+    importer.add_argument("--check", action="store_true", help="Run authenticated remote preflight checks without CIDS writes.")
     importer.add_argument("--yes", action="store_true", help="Confirm creating/updating all DLPs in the file.")
     importer.add_argument("--pretty", action="store_true", help="Pretty-print JSON instead of compact agent output.")
     importer.set_defaults(handler=cmd_import_week)

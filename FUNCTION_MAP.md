@@ -71,6 +71,12 @@ The DLP form exposed fields including `class_id`, `submit_observe`, `src`,
 `date`, and `dbug`. Button labels included Edit DLP, Delete DLP, Link to Shared
 Resources, Print/Save PDF, Go to YIP Main Page, and SK@S.
 
+The DLP edit page's **Knowledge** link opens
+`set9.php?action=instructional&src=rph&rph={rph}&rphaction=edit`. The form
+submits `savecontent` to `set9.php` with its lesson scope and request token.
+Learning Objectives use repeated `content[<group>][]` fields. CIDS supplies
+the group ID in the objective widget for the current curriculum.
+
 ## Yearly Instructional Plan (YIP)
 
 | CLI function | Method and route | Risk | Observed purpose / parameters |

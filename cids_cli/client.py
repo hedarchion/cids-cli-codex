@@ -21,6 +21,7 @@ from urllib.parse import urljoin
 warnings.filterwarnings("ignore", message="urllib3 v2 only supports OpenSSL")
 import requests
 
+from . import __version__
 from .auth import resolve_credentials
 
 
@@ -151,7 +152,7 @@ class CidsClient:
         self.timeout = timeout
         self.trace = trace
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "cids-cli/0.1.0", "Accept": "text/html,application/json;q=0.9,*/*;q=0.8"})
+        self.session.headers.update({"User-Agent": f"cids-cli/{__version__}", "Accept": "text/html,application/json;q=0.9,*/*;q=0.8"})
         self.secrets = []
         self._load_cookies()
 
